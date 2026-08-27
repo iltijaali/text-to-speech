@@ -1,11 +1,12 @@
 import { useRef, useState } from 'react';
+import './App.css';
 
 function App() {
   const [text, setText] = useState('');
-  const [audioFile, setAudioFile] = useState<File | null>(null);
   const [transcription, setTranscription] = useState('');
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
@@ -27,10 +28,19 @@ function App() {
       });
 
       const data: { text: string } = await response.json();
-      window.speechSynthesis.speak(new SpeechSynthesisUtterance(data.text));
+      const utterance = new SpeechSynthesisUtterance(data.text);
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => setIsSpeaking(false);
+      utterance.onerror = () => setIsSpeaking(false);
+      window.speechSynthesis.speak(utterance);
     } catch (error) {
       console.error('Text-to-speech error:', error);
     }
+  };
+
+  const handleStop = () => {
+    window.speechSynthesis.cancel();
+    setIsSpeaking(false);
   };
 
   const transcribeAudio = async (file: File) => {
@@ -64,15 +74,6 @@ function App() {
     }
   };
 
-  const handleTranscribe = () => {
-    if (!audioFile) {
-      alert('Please select an audio file');
-      return;
-    }
-
-    void transcribeAudio(audioFile);
-  };
-
   const startRecording = async () => {
     if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
       alert('Your browser does not support microphone recording.');
@@ -80,7 +81,9 @@ function App() {
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+      });
       const recorder = new MediaRecorder(stream);
       audioChunksRef.current = [];
 
@@ -102,7 +105,6 @@ function App() {
         );
 
         if (recordedAudio.size > 0) {
-          setAudioFile(recordedAudio);
           void transcribeAudio(recordedAudio);
         }
       });
@@ -124,60 +126,80 @@ function App() {
   };
 
   return (
-    <div>
-      <h1>Text to Speech App</h1>
+    <div className="app">
+      <header className="app-header">
+        <h1>Speech Studio</h1>
+        <p className="subtitle">Text to speech and speech to text, instantly.</p>
+      </header>
 
-      <textarea
-        placeholder="Write something here..."
-        value={text}
-        onChange={(event) => setText(event.target.value)}
-        rows={6}
-        cols={50}
-      />
+      <main className="panels">
+        <section className="card">
+          <div className="card-header">
+            <span className="card-icon" aria-hidden="true">
+              🔊
+            </span>
+            <h2>Text to Speech</h2>
+          </div>
 
-      <br />
-      <br />
+          <textarea
+            className="text-input"
+            placeholder="Type something to hear it out loud..."
+            value={text}
+            onChange={(event) => setText(event.target.value)}
+            rows={7}
+          />
 
-      <button onClick={handleSpeak}>🔊 Speak</button>
-      <br />
-      <br />
-
-      <button onClick={() => window.speechSynthesis.cancel()}>
-        ⏹ Stop
-      </button>
-
-      <hr />
-
-      <h2>Speech to Text</h2>
-      <button
-        onClick={isRecording ? stopRecording : () => void startRecording()}
-        disabled={isTranscribing}
-      >
-        {isRecording ? '⏹ Stop Recording' : '🎙 Start Recording'}
-      </button>
-      <p>{isRecording && 'Recording... speak now, then click Stop Recording.'}</p>
-      <p>Or upload an existing audio file:</p>
-      <input
-        type="file"
-        accept="audio/*"
-        onChange={(event) => {
-          setAudioFile(event.target.files?.[0] ?? null);
-          setTranscription('');
-        }}
-      />
-      <br />
-      <br />
-
-      <button onClick={handleTranscribe} disabled={!audioFile || isTranscribing}>
-        {isTranscribing ? 'Transcribing...' : 'Convert Voice to Text'}
-      </button>
-
-      {transcription && (
-        <section>
-          <h3>Transcription</h3>
-          <p>{transcription}</p>
+          <div className="actions">
+            <button
+              className="btn btn-primary"
+              onClick={() => void handleSpeak()}
+              disabled={isSpeaking}
+            >
+              {isSpeaking ? 'Speaking…' : '▶ Speak'}
+            </button>
+            <button
+              className="btn btn-ghost"
+              onClick={handleStop}
+              disabled={!isSpeaking}
+            >
+              ■ Stop
+            </button>
+          </div>
         </section>
-      )}
+
+        <section className="card">
+          <div className="card-header">
+            <span className="card-icon" aria-hidden="true">
+              🎙
+            </span>
+            <h2>Speech to Text</h2>
+          </div>
+
+          <div className="record-area">
+            <button
+              className={`mic-button ${isRecording ? 'is-recording' : ''}`}
+              onClick={isRecording ? stopRecording : () => void startRecording()}
+              disabled={isTranscribing}
+              aria-label={isRecording ? 'Stop recording' : 'Start recording'}
+            >
+              <span className="mic-icon" aria-hidden="true">
+                {isRecording ? '■' : '🎙'}
+              </span>
+            </button>
+            <p className="record-status">
+              {isRecording
+                ? 'Listening… click to stop'
+                : isTranscribing
+                  ? 'Transcribing…'
+                  : 'Click the mic to start recording'}
+            </p>
+          </div>
+
+          <div className={`transcript ${transcription ? 'has-content' : ''}`}>
+            {transcription || 'Your transcription will appear here.'}
+          </div>
+        </section>
+      </main>
     </div>
   );
 }
