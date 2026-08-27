@@ -1,0 +1,24 @@
+services:
+  stt-service:
+    build: ./stt-service
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  backend:
+    build: ./beckend
+    ports:
+      - "3003:3003"
+    environment:
+      STT_SERVICE_URL: http://stt-service:8000/transcribe
+    depends_on:
+      - stt-service
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5175:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
