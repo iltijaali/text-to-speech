@@ -3,6 +3,14 @@ services:
     build: ./stt-service
     ports:
       - "8000:8000"
+    volumes:
+      - whisper-model-cache:/root/.cache/huggingface
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
     restart: unless-stopped
 
   backend:
@@ -12,7 +20,8 @@ services:
     environment:
       STT_SERVICE_URL: http://stt-service:8000/transcribe
     depends_on:
-      - stt-service
+      stt-service:
+        condition: service_healthy
     restart: unless-stopped
 
   frontend:
@@ -22,3 +31,6 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
+
+volumes:
+  whisper-model-cache:

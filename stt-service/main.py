@@ -1,5 +1,6 @@
 from fastapi import FastAPI, UploadFile, File
 from transformers import pipeline
+import asyncio
 import tempfile
 import os
 
@@ -9,7 +10,9 @@ print("Loading Whisper Small model...")
 
 transcriber = pipeline(
     "automatic-speech-recognition",
-    model="openai/whisper-small"
+    model="openai/whisper-small",
+    chunk_length_s=30,
+    stride_length_s=5,
 )
 
 print("Model loaded successfully!")
@@ -34,8 +37,9 @@ async def transcribe_audio(file: UploadFile = File(...)):
         temp_file_path = temp_file.name
 
     try:
-        # Send audio to Whisper
-        result = transcriber(temp_file_path)
+        # Run the blocking Whisper inference in a thread so it doesn't
+        # freeze the event loop for the whole request duration.
+        result = await asyncio.to_thread(transcriber, temp_file_path)
 
         return {
             "text": result["text"]
