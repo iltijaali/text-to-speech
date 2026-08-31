@@ -46,28 +46,40 @@ function App() {
   const transcribeAudio = async (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
+    const maxAttempts = 20;
+
+    setIsTranscribing(true);
+    setTranscription('');
 
     try {
-      setIsTranscribing(true);
-      setTranscription('');
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        const response = await fetch('http://localhost:3003/stt/transcribe', {
+          method: 'POST',
+          body: formData,
+        });
 
-      const response = await fetch('http://localhost:3003/stt/transcribe', {
-        method: 'POST',
-        body: formData,
-      });
-      const data: { text?: string; message?: string | string[] } =
-        await response.json();
+        if (response.status === 503 && attempt < maxAttempts) {
+          setTranscription('Speech service is still starting up. Retrying…');
+          await new Promise((resolve) => setTimeout(resolve, 5000));
+          continue;
+        }
 
-      if (!response.ok || !data.text) {
-        const message = Array.isArray(data.message)
-          ? data.message.join(', ')
-          : data.message;
-        throw new Error(message ?? 'Transcription failed');
+        const data: { text?: string; message?: string | string[] } =
+          await response.json();
+
+        if (!response.ok || !data.text) {
+          const message = Array.isArray(data.message)
+            ? data.message.join(', ')
+            : data.message;
+          throw new Error(message ?? 'Transcription failed');
+        }
+
+        setTranscription(data.text);
+        return;
       }
-
-      setTranscription(data.text);
     } catch (error) {
       console.error('Speech-to-text error:', error);
+      setTranscription('');
       alert(error instanceof Error ? error.message : 'Transcription failed');
     } finally {
       setIsTranscribing(false);
@@ -164,6 +176,13 @@ function App() {
             >
               ■ Stop
             </button>
+            <button
+              className="btn btn-ghost"
+              onClick={() => setText('')}
+              disabled={!text || isSpeaking}
+            >
+              ✕ Clear
+            </button>
           </div>
         </section>
 
@@ -197,6 +216,16 @@ function App() {
 
           <div className={`transcript ${transcription ? 'has-content' : ''}`}>
             {transcription || 'Your transcription will appear here.'}
+          </div>
+
+          <div className="actions">
+            <button
+              className="btn btn-ghost"
+              onClick={() => setTranscription('')}
+              disabled={!transcription || isTranscribing}
+            >
+              ✕ Clear
+            </button>
           </div>
         </section>
       </main>
