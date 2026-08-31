@@ -39,7 +39,17 @@ async def transcribe_audio(file: UploadFile = File(...)):
     try:
         # Run the blocking Whisper inference in a thread so it doesn't
         # freeze the event loop for the whole request duration.
-        result = await asyncio.to_thread(transcriber, temp_file_path)
+        # no_repeat_ngram_size/repetition_penalty prevent the model from
+        # getting stuck in a repeated-token loop on silent or noisy audio,
+        # which otherwise runs until it exhausts its generation budget.
+        result = await asyncio.to_thread(
+            transcriber,
+            temp_file_path,
+            generate_kwargs={
+                "no_repeat_ngram_size": 3,
+                "repetition_penalty": 1.3,
+            },
+        )
 
         return {
             "text": result["text"]

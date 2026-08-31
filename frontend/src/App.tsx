@@ -176,6 +176,13 @@ function App() {
             >
               ■ Stop
             </button>
+            <button
+              className="btn btn-ghost"
+              onClick={() => setText('')}
+              disabled={!text || isSpeaking}
+            >
+              ✕ Clear
+            </button>
           </div>
         </section>
 
@@ -209,6 +216,16 @@ function App() {
 
           <div className={`transcript ${transcription ? 'has-content' : ''}`}>
             {transcription || 'Your transcription will appear here.'}
+          </div>
+
+          <div className="actions">
+            <button
+              className="btn btn-ghost"
+              onClick={() => setTranscription('')}
+              disabled={!transcription || isTranscribing}
+            >
+              ✕ Clear
+            </button>
           </div>
         </section>
       </main>
